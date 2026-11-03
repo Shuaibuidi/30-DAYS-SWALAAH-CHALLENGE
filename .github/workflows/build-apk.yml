@@ -1,4 +1,3 @@
-
 name: Build 30 Days Swalaah Challenge APK
 
 on:
@@ -33,7 +32,16 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android sharp
 
-      - name: Generate all launcher icons
+      - name: Create Android project
+        run: |
+          test -f icon.png
+          mkdir -p www
+          cp index.html www/index.html
+          npx cap init "30 Days Swalaah Challenge" "com.siatech.swalaahchallenge" --web-dir www
+          npx cap add android
+          npx cap sync android
+
+      - name: Generate custom launcher icons
         run: |
           node --input-type=module <<'EOF'
           import sharp from 'sharp';
@@ -83,5 +91,90 @@ jobs:
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher.xml`, xml);
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher_round.xml`, xml);
 
-          console.log('Unique custom launcher foreground generated.');
+          console.log('Custom launcher icons generated successfully.');
           EOF
+
+      - name: Verify generated icons
+        run: |
+          test -s icon.png
+          test -s android/app/src/main/res/drawable/sia_launcher_foreground.png
+          test -s android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          echo "SUCCESS: Custom launcher icons exist."
+
+      - name: Connect custom icon to Android manifest
+        run: |
+          python3 - <<'PY'
+          import re
+
+          path = 'android/app/src/main/AndroidManifest.xml'
+
+          with open(path, encoding='utf-8') as f:
+              content = f.read()
+
+          pattern = r'<application\b[^>]*>'
+          match = re.search(pattern, content)
+
+          if not match:
+              raise SystemExit("ERROR: Application tag not found.")
+
+          tag = match.group(0)
+
+          tag = re.sub(r'\s+android:icon="[^"]+"', '', tag)
+          tag = re.sub(r'\s+android:roundIcon="[^"]+"', '', tag)
+
+          tag = tag[:-1] + (
+              ' android:icon="@mipmap/ic_launcher"'
+              ' android:roundIcon="@mipmap/ic_launcher_round">'
+          )
+
+          content = content[:match.start()] + tag + content[match.end():]
+
+          with open(path, 'w', encoding='utf-8') as f:
+              f.write(content)
+
+          print("Custom launcher icons connected successfully.")
+          print(re.search(pattern, content).group(0))
+          PY
+
+      - name: Fix Kotlin dependencies
+        run: |
+          cat >> android/build.gradle <<'EOF'
+
+          allprojects {
+              configurations.configureEach {
+                  resolutionStrategy.force(
+                      'org.jetbrains.kotlin:kotlin-stdlib:1.8.22',
+                      'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22',
+                      'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+                  )
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew clean assembleDebug
+
+      - name: Verify custom icon inside APK
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+
+          test -s "$APK"
+
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt | sort -V | tail -n 1)
+
+          "$AAPT" dump badging "$APK" | grep -E "application-icon|launchable-activity"
+
+          echo "Checking custom foreground image..."
+
+          unzip -l "$APK" | grep 'sia_launcher_foreground'
+
+          echo "Custom icon verification completed."
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 30-Days-Swalaah-Challenge-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
