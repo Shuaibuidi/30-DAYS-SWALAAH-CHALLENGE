@@ -1,4 +1,3 @@
-
 name: Build 30 Days Swalaah Challenge APK
 
 on:
@@ -28,20 +27,21 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Install Capacitor
+      - name: Install dependencies
         run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android sharp
 
       - name: Create Android project
         run: |
+          test -f icon.png
           mkdir -p www
           cp index.html www/index.html
           npx cap init "30 Days Swalaah Challenge" "com.siatech.swalaahchallenge" --web-dir www
           npx cap add android
           npx cap sync android
 
-      - name: Generate launcher icons
+      - name: Generate all launcher icons
         run: |
           node --input-type=module <<'EOF'
           import sharp from 'sharp';
@@ -74,7 +74,7 @@ jobs:
           fs.mkdirSync(`${base}/mipmap-anydpi-v26`, { recursive: true });
 
           await sharp('icon.png')
-            .resize(432, 432, { fit: 'contain', background: '#087A45' })
+            .resize(432, 432, { fit: 'contain' })
             .png()
             .toFile(`${base}/drawable/ic_launcher_foreground.png`);
 
@@ -90,21 +90,46 @@ jobs:
 
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher.xml`, xml);
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher_round.xml`, xml);
-
-          const manifest = 'android/app/src/main/AndroidManifest.xml';
-          let content = fs.readFileSync(manifest, 'utf8');
-          content = content.replace(/android:icon="[^"]+"/, 'android:icon="@mipmap/ic_launcher"');
-          content = content.replace(/android:roundIcon="[^"]+"/, 'android:roundIcon="@mipmap/ic_launcher_round"');
-
-          if (!content.includes('android:roundIcon=')) {
-            content = content.replace(
-              /android:icon="@mipmap\/ic_launcher"/,
-              'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"'
-            );
-          }
-
-          fs.writeFileSync(manifest, content);
           EOF
+
+      - name: Connect custom icon to Android manifest
+        run: |
+          python3 - <<'PY'
+          import re
+
+          path = 'android/app/src/main/AndroidManifest.xml'
+          with open(path, encoding='utf-8') as f:
+              content = f.read()
+
+          content, count = re.subn(
+              r'android:icon="[^"]+"',
+              'android:icon="@mipmap/ic_launcher"',
+              content,
+              count=1
+          )
+
+          if count == 0:
+              raise SystemExit("ERROR: Could not find application icon in manifest")
+
+          if 'android:roundIcon=' in content:
+              content = re.sub(
+                  r'android:roundIcon="[^"]+"',
+                  'android:roundIcon="@mipmap/ic_launcher_round"',
+                  content,
+                  count=1
+              )
+          else:
+              content = content.replace(
+                  'android:icon="@mipmap/ic_launcher"',
+                  'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"',
+                  1
+              )
+
+          with open(path, 'w', encoding='utf-8') as f:
+              f.write(content)
+
+          print("Custom launcher icons connected successfully.")
+          PY
 
       - name: Fix Kotlin dependencies
         run: |
@@ -125,7 +150,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew clean assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
