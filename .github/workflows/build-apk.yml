@@ -1,3 +1,4 @@
+
 name: Build 30 Days Swalaah Challenge APK
 
 on:
@@ -57,6 +58,9 @@ jobs:
             'mipmap-xxxhdpi': 192
           };
 
+          const metadata = await sharp('icon.png').metadata();
+          console.log('Source icon:', metadata.width, 'x', metadata.height);
+
           for (const [folder, size] of Object.entries(sizes)) {
             const dir = `${base}/${folder}`;
             fs.mkdirSync(dir, { recursive: true });
@@ -66,6 +70,8 @@ jobs:
                 .resize(size, size, { fit: 'cover' })
                 .png()
                 .toFile(`${dir}/${name}`);
+
+              console.log('Created:', `${dir}/${name}`);
             }
           }
 
@@ -90,7 +96,24 @@ jobs:
 
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher.xml`, xml);
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher_round.xml`, xml);
+
+          console.log('All custom launcher icons generated successfully.');
           EOF
+
+      - name: Verify generated icons
+        run: |
+          echo "Checking custom launcher icon files..."
+
+          test -s icon.png
+          test -s android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          test -s android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          test -s android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          test -s android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          test -s android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          test -s android/app/src/main/res/drawable/ic_launcher_foreground.png
+          test -s android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+
+          echo "SUCCESS: All required custom icon files exist."
 
       - name: Connect custom icon to Android manifest
         run: |
@@ -98,37 +121,46 @@ jobs:
           import re
 
           path = 'android/app/src/main/AndroidManifest.xml'
+
           with open(path, encoding='utf-8') as f:
               content = f.read()
 
-          content, count = re.subn(
-              r'android:icon="[^"]+"',
-              'android:icon="@mipmap/ic_launcher"',
-              content,
-              count=1
+          pattern = r'<application\b[^>]*>'
+
+          match = re.search(pattern, content)
+
+          if not match:
+              raise SystemExit("ERROR: Application tag not found.")
+
+          tag = match.group(0)
+
+          tag = re.sub(
+              r'\s+android:icon="[^"]+"',
+              '',
+              tag
           )
 
-          if count == 0:
-              raise SystemExit("ERROR: Could not find application icon in manifest")
+          tag = re.sub(
+              r'\s+android:roundIcon="[^"]+"',
+              '',
+              tag
+          )
 
-          if 'android:roundIcon=' in content:
-              content = re.sub(
-                  r'android:roundIcon="[^"]+"',
-                  'android:roundIcon="@mipmap/ic_launcher_round"',
-                  content,
-                  count=1
-              )
-          else:
-              content = content.replace(
-                  'android:icon="@mipmap/ic_launcher"',
-                  'android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"',
-                  1
-              )
+          tag = tag[:-1] + (
+              ' android:icon="@mipmap/ic_launcher"'
+              ' android:roundIcon="@mipmap/ic_launcher_round">'
+          )
+
+          content = content[:match.start()] + tag + content[match.end():]
 
           with open(path, 'w', encoding='utf-8') as f:
               f.write(content)
 
-          print("Custom launcher icons connected successfully.")
+          print("Custom icons connected to application manifest.")
+
+          print(
+              re.search(pattern, content).group(0)
+          )
           PY
 
       - name: Fix Kotlin dependencies
@@ -151,6 +183,29 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew clean assembleDebug
+
+      - name: Verify launcher icon inside APK
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+
+          test -s "$APK"
+
+          echo "Checking APK launcher icon resources..."
+
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt | sort -V | tail -n 1)
+
+          if [ -z "$AAPT" ]; then
+            echo "ERROR: Android aapt tool not found."
+            exit 1
+          fi
+
+          "$AAPT" dump badging "$APK" | grep -E "application-label|application-icon|launchable-activity"
+
+          echo "Checking icon files packaged in APK..."
+
+          unzip -l "$APK" | grep -E 'ic_launcher|ic_launcher_foreground'
+
+          echo "APK icon verification completed."
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
