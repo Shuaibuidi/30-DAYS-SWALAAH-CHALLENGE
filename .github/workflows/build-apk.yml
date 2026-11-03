@@ -1,0 +1,116 @@
+name: Build 30 Days Swalaah Challenge APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'index.html'
+      - 'icon.png'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Capacitor
+        run: |
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android sharp
+
+      - name: Create Android project
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+          npx cap init "30 Days Swalaah Challenge" "com.siatech.swalaahchallenge" --web-dir www
+          npx cap add android
+          npx cap sync android
+
+      - name: Generate Android icons
+        run: |
+          node --input-type=module <<'EOF'
+          import sharp from 'sharp';
+          import fs from 'fs';
+
+          const sizes = {
+            'mipmap-mdpi': 48,
+            'mipmap-hdpi': 72,
+            'mipmap-xhdpi': 96,
+            'mipmap-xxhdpi': 144,
+            'mipmap-xxxhdpi': 192
+          };
+
+          for (const [folder, size] of Object.entries(sizes)) {
+            const dir = `android/app/src/main/res/${folder}`;
+            fs.mkdirSync(dir, { recursive: true });
+            await sharp('icon.png').resize(size, size).png()
+              .toFile(`${dir}/ic_launcher.png`);
+            await sharp('icon.png').resize(size, size).png()
+              .toFile(`${dir}/ic_launcher_round.png`);
+          }
+
+          const adaptive = 'android/app/src/main/res/mipmap-anydpi-v26';
+          fs.mkdirSync(adaptive, { recursive: true });
+
+          const foreground = 'android/app/src/main/res/drawable';
+          fs.mkdirSync(foreground, { recursive: true });
+
+          await sharp('icon.png')
+            .resize(432, 432, { fit: 'contain' })
+            .png()
+            .toFile(`${foreground}/ic_launcher_foreground.png`);
+
+          fs.writeFileSync(
+            'android/app/src/main/res/values/ic_launcher_background.xml',
+            '<resources><color name="ic_launcher_background">#087A45</color></resources>'
+          );
+
+          const xml = `<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+            <background android:drawable="@color/ic_launcher_background"/>
+            <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+          </adaptive-icon>`;
+
+          fs.writeFileSync(`${adaptive}/ic_launcher.xml`, xml);
+          fs.writeFileSync(`${adaptive}/ic_launcher_round.xml`, xml);
+          EOF
+
+      - name: Fix Kotlin dependencies
+        run: |
+          cat >> android/build.gradle <<'EOF'
+
+          allprojects {
+              configurations.configureEach {
+                  resolutionStrategy.force(
+                      'org.jetbrains.kotlin:kotlin-stdlib:1.8.22',
+                      'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22',
+                      'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+                  )
+              }
+          }
+          EOF
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 30-Days-Swalaah-Challenge-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
