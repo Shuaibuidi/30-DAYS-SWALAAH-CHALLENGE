@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b3d2e">
+<title>30 Days Swalaah Challenge</title>
+<style>
+:root{--green:#0b3d2e;--green2:#145b43;--gold:#d7b45a;--cream:#f7f4e9;--ink:#18352b;--muted:#6d7c73;--white:#fff}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#092f24,#14543e);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--ink);min-height:100vh;padding:18px 12px 34px}
+.app{max-width:760px;margin:auto}.top{text-align:center;color:white;padding:15px 8px 20px}.crescent{font-size:34px;color:var(--gold)}h1{font-size:clamp(25px,6vw,36px);line-height:1.12;margin:5px 0;color:#f6e6b2}.subtitle{margin:7px 0 0;color:#e5e9df;font-size:14px}.owner{font-size:12px;color:#d7c58e;margin-top:8px}
+.card{background:var(--cream);border:1px solid rgba(215,180,90,.65);border-radius:20px;padding:17px;margin:12px 0;box-shadow:0 10px 25px #001b1240}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.section-title{font-weight:800;color:var(--green);font-size:17px;margin:0 0 12px}
+.progress-wrap{height:12px;background:#dce4d9;border-radius:20px;overflow:hidden;margin:10px 0}.progress{height:100%;width:0;background:linear-gradient(90deg,#176b4b,var(--gold));border-radius:20px;transition:width .2s}
+.big{font-size:30px;font-weight:850;color:var(--green)}.muted{color:var(--muted);font-size:13px}.date{font-weight:750;color:var(--green)}
+.monthbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}.monthbar button,.btn{border:0;border-radius:11px;background:var(--green);color:white;padding:10px 14px;font-weight:700;cursor:pointer}.monthbar button{padding:8px 13px}.monthbar strong{color:var(--green);font-size:17px}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}.weekday{text-align:center;font-size:11px;color:var(--muted);font-weight:800;padding:5px 0}.day{min-height:46px;border:1px solid #dce2d8;border-radius:10px;background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:13px;cursor:pointer;position:relative}.day small{font-size:9px;color:var(--muted)}.day.inactive{opacity:.35}.day.selected{outline:2px solid var(--gold);background:#fff6d9}.day.done{background:#e0f1e5;border-color:#80b494}.day.today{box-shadow:inset 0 0 0 2px var(--green)}.day .dot{position:absolute;bottom:3px;width:5px;height:5px;border-radius:50%;background:#17814f}
+.prayers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.prayer{background:white;border:1px solid #dfe5db;border-radius:12px;padding:13px;display:flex;align-items:center;gap:10px;font-weight:700}.prayer input{width:21px;height:21px;accent-color:var(--green)}
+textarea{width:100%;min-height:105px;resize:vertical;border:1px solid #ccd8cd;border-radius:12px;padding:12px;font:inherit;background:white;color:var(--ink)}.actions{display:flex;gap:9px;flex-wrap:wrap}.btn.secondary{background:#e5eadf;color:var(--green);border:1px solid #c8d5c9}.foot{text-align:center;color:#dbe7dc;font-size:11px;padding:15px}
+@media(max-width:420px){body{padding:10px 8px 25px}.card{padding:14px}.prayers{grid-template-columns:1fr 1fr}.day{min-height:41px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="crescent">☾</div><h1>30 Days Swalaah Challenge</h1><p class="subtitle">Build consistency, one prayer at a time.</p><div class="owner">Build by Shuaibu Idi · S I A Tech Print Media</div></header>
+<section class="card">
+ <div class="row"><div><div class="muted">CHALLENGE START DATE</div><div class="date" id="startDate"></div></div><div style="text-align:right"><div class="muted">DAYS COMPLETED</div><div class="big" id="daysDone">0 / 30</div></div></div>
+ <div class="progress-wrap"><div class="progress" id="progress"></div></div>
+ <div class="row"><span class="muted" id="progressText">0% completed</span><span class="muted" id="streakText">Keep going!</span></div>
+</section>
+<section class="card">
+ <h2 class="section-title">Challenge calendar</h2>
+ <div class="monthbar"><button id="prev" aria-label="Previous month">‹</button><strong id="monthLabel"></strong><button id="next" aria-label="Next month">›</button></div>
+ <div class="calendar" id="calendar"></div>
+ <p class="muted" style="margin:10px 0 0">Your 30 challenge days are counted from the start date. Tap a challenge date to record your prayers.</p>
+</section>
+<section class="card">
+ <div class="row"><h2 class="section-title" style="margin:0">Daily prayer tracker</h2><span class="date" id="selectedDate"></span></div>
+ <p class="muted" id="dayNumber"></p>
+ <div class="prayers" id="prayers"></div>
+ <div class="row" style="margin-top:13px"><span class="muted" id="dailyCount">0 of 5 prayers marked</span><span class="muted" id="dailyStatus">A fresh start</span></div>
+</section>
+<section class="card">
+ <h2 class="section-title">Daily reflection</h2>
+ <p class="muted">What went well today? What can you improve tomorrow? Write a short reflection.</p>
+ <textarea id="reflection" placeholder="Today I am grateful for..."></textarea>
+ <div class="actions" style="margin-top:12px"><button class="btn" id="save">Save today's record</button><button class="btn secondary" id="today">Go to today</button></div>
+ <p class="muted" id="savedMsg" aria-live="polite" style="margin-bottom:0"></p>
+</section>
+<div class="foot">May Allah make us steadfast in our five daily prayers. Ameen.<br>Data is saved on this phone/browser automatically.</div>
+</div>
+<script>
+(()=>{
+ const KEY='sia_swalaah_challenge_v1';
+ const today=new Date(); today.setHours(0,0,0,0);
+ const dateKey=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+ const fmt=d=>d.toLocaleDateString(undefined,{weekday:'short',month:'long',day:'numeric',year:'numeric'});
+ const addDays=(d,n)=>{let x=new Date(d);x.setDate(x.getDate()+n);return x};
+ const defaultData={start:dateKey(today),records:{}};
+ let data; try{data=JSON.parse(localStorage.getItem(KEY))||defaultData}catch(e){data=defaultData}
+ if(!data.start)data.start=defaultData.start;if(!data.records)data.records={};
+ const start=parse(data.start); let selected=new Date(today); let view=new Date(today.getFullYear(),today.getMonth(),1);
+ const prayers=['Fajr','Dhuhr','Asr','Maghrib','Isha'];
+ const saveData=()=>localStorage.setItem(KEY,JSON.stringify(data));
+ const dayIndex=d=>Math.round((d-start)/86400000)+1;
+ const inChallenge=d=>dayIndex(d)>=1&&dayIndex(d)<=30;
+ const record=d=>data.records[dateKey(d)]||{prayers:{},reflection:''};
+ function updateSummary(){
+   let completed=0;for(let i=0;i<30;i++){let r=record(addDays(start,i));if(prayers.every(p=>r.prayers[p]))completed++}
+   document.getElementById('daysDone').textContent=`${completed} / 30`;
+   document.getElementById('progress').style.width=(completed/30*100)+'%';
+   document.getElementById('progressText').textContent=Math.round(completed/30*100)+'% completed';
+   let streak=0;for(let i=29;i>=0;i--){let r=record(addDays(start,i));if(prayers.every(p=>r.prayers[p]))streak++;else if(streak)break}
+   document.getElementById('streakText').textContent=streak?`${streak} completed day${streak===1?'':'s'} in a row`:'Keep going!';
+   document.getElementById('startDate').textContent=fmt(start);
+ }
+ function renderCalendar(){
+   const el=document.getElementById('calendar');el.innerHTML='';
+   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(x=>{let n=document.createElement('div');n.className='weekday';n.textContent=x;el.append(n)});
+   document.getElementById('monthLabel').textContent=view.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+   const first=new Date(view.getFullYear(),view.getMonth(),1), offset=first.getDay(), count=new Date(view.getFullYear(),view.getMonth()+1,0).getDate();
+   for(let i=0;i<offset;i++){let blank=document.createElement('div');el.append(blank)}
+   for(let n=1;n<=count;n++){
+     let d=new Date(view.getFullYear(),view.getMonth(),n), b=document.createElement('button');b.className='day';b.type='button';
+     if(!inChallenge(d))b.classList.add('inactive');if(dateKey(d)===dateKey(selected))b.classList.add('selected');if(dateKey(d)===dateKey(today))b.classList.add('today');
+     let r=record(d),done=inChallenge(d)&&prayers.every(p=>r.prayers[p]);if(done)b.classList.add('done');
+     b.innerHTML=`<span>${n}</span>${inChallenge(d)?`<small>Day ${dayIndex(d)}</small>`:''}${done?'<i class="dot"></i>':''}`;
+     b.addEventListener('click',()=>{selected=d;renderCalendar();renderDay()});el.append(b);
+   }
+ }
+ function renderDay(){
+   const key=dateKey(selected),r=record(selected),idx=dayIndex(selected);
+   document.getElementById('selectedDate').textContent=fmt(selected);
+   document.getElementById('dayNumber').textContent=inChallenge(selected)?`Challenge Day ${idx} of 30`:'This date is outside your 30-day challenge.';
+   const wrap=document.getElementById('prayers');wrap.innerHTML='';
+   prayers.forEach(p=>{let label=document.createElement('label');label.className='prayer';let cb=document.createElement('input');cb.type='checkbox';cb.checked=!!r.prayers[p];cb.disabled=!inChallenge(selected);cb.addEventListener('change',()=>{let rr=record(selected);rr.prayers[p]=cb.checked;data.records[key]=rr;saveData();renderDay();renderCalendar();updateSummary()});label.append(cb,document.createTextNode(p));wrap.append(label)});
+   const count=prayers.filter(p=>r.prayers[p]).length;document.getElementById('dailyCount').textContent=`${count} of 5 prayers marked`;
+   document.getElementById('dailyStatus').textContent=count===5?'All five completed ✓':count===0?'A fresh start':'Keep it up';
+   document.getElementById('reflection').value=r.reflection||'';
+ }
+ document.getElementById('prev').onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()-1,1);renderCalendar()};
+ document.getElementById('next').onclick=()=>{view=new Date(view.getFullYear(),view.getMonth()+1,1);renderCalendar()};
+ document.getElementById('today').onclick=()=>{selected=new Date(today);view=new Date(today.getFullYear(),today.getMonth(),1);renderCalendar();renderDay()};
+ document.getElementById('save').onclick=()=>{let r=record(selected);r.reflection=document.getElementById('reflection').value;data.records[dateKey(selected)]=r;saveData();document.getElementById('savedMsg').textContent='Saved on this device ✓';renderCalendar();updateSummary()};
+ document.getElementById('reflection').addEventListener('input',()=>{let r=record(selected);r.reflection=document.getElementById('reflection').value;data.records[dateKey(selected)]=r;saveData();document.getElementById('savedMsg').textContent='Auto-saved ✓'});
+ saveData();updateSummary();renderCalendar();renderDay();
+})();
+</script>
+</body></html>
