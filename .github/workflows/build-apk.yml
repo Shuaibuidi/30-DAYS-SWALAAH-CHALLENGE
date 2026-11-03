@@ -33,15 +33,6 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android sharp
 
-      - name: Create Android project
-        run: |
-          test -f icon.png
-          mkdir -p www
-          cp index.html www/index.html
-          npx cap init "30 Days Swalaah Challenge" "com.siatech.swalaahchallenge" --web-dir www
-          npx cap add android
-          npx cap sync android
-
       - name: Generate all launcher icons
         run: |
           node --input-type=module <<'EOF'
@@ -58,9 +49,6 @@ jobs:
             'mipmap-xxxhdpi': 192
           };
 
-          const metadata = await sharp('icon.png').metadata();
-          console.log('Source icon:', metadata.width, 'x', metadata.height);
-
           for (const [folder, size] of Object.entries(sizes)) {
             const dir = `${base}/${folder}`;
             fs.mkdirSync(dir, { recursive: true });
@@ -70,8 +58,6 @@ jobs:
                 .resize(size, size, { fit: 'cover' })
                 .png()
                 .toFile(`${dir}/${name}`);
-
-              console.log('Created:', `${dir}/${name}`);
             }
           }
 
@@ -82,7 +68,7 @@ jobs:
           await sharp('icon.png')
             .resize(432, 432, { fit: 'contain' })
             .png()
-            .toFile(`${base}/drawable/ic_launcher_foreground.png`);
+            .toFile(`${base}/drawable/sia_launcher_foreground.png`);
 
           fs.writeFileSync(
             `${base}/values/ic_launcher_background.xml`,
@@ -91,124 +77,11 @@ jobs:
 
           const xml = `<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
             <background android:drawable="@color/ic_launcher_background"/>
-            <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+            <foreground android:drawable="@drawable/sia_launcher_foreground"/>
           </adaptive-icon>`;
 
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher.xml`, xml);
           fs.writeFileSync(`${base}/mipmap-anydpi-v26/ic_launcher_round.xml`, xml);
 
-          console.log('All custom launcher icons generated successfully.');
+          console.log('Unique custom launcher foreground generated.');
           EOF
-
-      - name: Verify generated icons
-        run: |
-          echo "Checking custom launcher icon files..."
-
-          test -s icon.png
-          test -s android/app/src/main/res/mipmap-mdpi/ic_launcher.png
-          test -s android/app/src/main/res/mipmap-hdpi/ic_launcher.png
-          test -s android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
-          test -s android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
-          test -s android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-          test -s android/app/src/main/res/drawable/ic_launcher_foreground.png
-          test -s android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-
-          echo "SUCCESS: All required custom icon files exist."
-
-      - name: Connect custom icon to Android manifest
-        run: |
-          python3 - <<'PY'
-          import re
-
-          path = 'android/app/src/main/AndroidManifest.xml'
-
-          with open(path, encoding='utf-8') as f:
-              content = f.read()
-
-          pattern = r'<application\b[^>]*>'
-
-          match = re.search(pattern, content)
-
-          if not match:
-              raise SystemExit("ERROR: Application tag not found.")
-
-          tag = match.group(0)
-
-          tag = re.sub(
-              r'\s+android:icon="[^"]+"',
-              '',
-              tag
-          )
-
-          tag = re.sub(
-              r'\s+android:roundIcon="[^"]+"',
-              '',
-              tag
-          )
-
-          tag = tag[:-1] + (
-              ' android:icon="@mipmap/ic_launcher"'
-              ' android:roundIcon="@mipmap/ic_launcher_round">'
-          )
-
-          content = content[:match.start()] + tag + content[match.end():]
-
-          with open(path, 'w', encoding='utf-8') as f:
-              f.write(content)
-
-          print("Custom icons connected to application manifest.")
-
-          print(
-              re.search(pattern, content).group(0)
-          )
-          PY
-
-      - name: Fix Kotlin dependencies
-        run: |
-          cat >> android/build.gradle <<'EOF'
-
-          allprojects {
-              configurations.configureEach {
-                  resolutionStrategy.force(
-                      'org.jetbrains.kotlin:kotlin-stdlib:1.8.22',
-                      'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22',
-                      'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
-                  )
-              }
-          }
-          EOF
-
-      - name: Build APK
-        run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew clean assembleDebug
-
-      - name: Verify launcher icon inside APK
-        run: |
-          APK="android/app/build/outputs/apk/debug/app-debug.apk"
-
-          test -s "$APK"
-
-          echo "Checking APK launcher icon resources..."
-
-          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt | sort -V | tail -n 1)
-
-          if [ -z "$AAPT" ]; then
-            echo "ERROR: Android aapt tool not found."
-            exit 1
-          fi
-
-          "$AAPT" dump badging "$APK" | grep -E "application-label|application-icon|launchable-activity"
-
-          echo "Checking icon files packaged in APK..."
-
-          unzip -l "$APK" | grep -E 'ic_launcher|ic_launcher_foreground'
-
-          echo "APK icon verification completed."
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: 30-Days-Swalaah-Challenge-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
